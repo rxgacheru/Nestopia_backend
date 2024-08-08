@@ -3,6 +3,11 @@ from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator
 from datetime import date, timedelta
+import logging
+from twilio.rest import Client as TwilioClient
+from django.conf import settings
+from django.core.mail import send_mail
+
 
 
 
@@ -142,6 +147,7 @@ class House(models.Model):
     #OCCUPANTS
 
 
+logger = logging.getLogger(__name__)
 
 class Tenant(models.Model):
     PAYMENT_STATUS_CHOICES = [
@@ -208,6 +214,7 @@ class Tenant(models.Model):
 
         self.last_payment_date = date.today()
         self.save()
+        self.send_payment_notification()
 
     def update_garbage_payment_status(self, amount_paid):
         if self.garbage_payment_status == 'completed':
@@ -237,6 +244,47 @@ class Tenant(models.Model):
 
         self.last_garbage_payment_date = date.today()
         self.save()
+        self.send_payment_notification()
+
+    def send_payment_notification(self):
+        # Send email notification if email is provided
+        if self.email:
+            try:
+                subject = 'Payment Status Update'
+                message = (
+                    f"Dear {self.name},\n\n"
+                    f"Your current payment status is as follows:\n"
+                    f"Rent Payment Status: {self.payment_status}\n"
+                    f"Rent Deficit: {self.rent_deficit}\n"
+                    f"Garbage Fee Payment Status: {self.garbage_payment_status}\n"
+                    f"Garbage Deficit: {self.garbage_deficit}\n\n"
+                    f"Thank you."
+                )
+                send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [self.email])
+            except Exception as e:
+                logger.error(f"Failed to send email to {self.email}: {str(e)}")
+
+        # Send SMS notification if mobile phone is provided
+        if self.mobile_phone:
+            try:
+                # Initialize Twilio client
+                client = TwilioClient(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+                message = (
+                    f"Dear {self.name},\n\n"
+                    f"Your payment status is as follows:\n"
+                    f"Rent Payment Status: {self.payment_status}\n"
+                    f"Rent Deficit: {self.rent_deficit}\n"
+                    f"Garbage Fee Payment Status: {self.garbage_payment_status}\n"
+                    f"Garbage Deficit: {self.garbage_deficit}\n\n"
+                    f"Thank you."
+                )
+                client.messages.create(
+                    body=message,
+                    from_=settings.TWILIO_PHONE_NUMBER,
+                    to=self.mobile_phone
+                )
+            except Exception as e:
+                logger.error(f"Failed to send SMS to {self.mobile_phone}: {str(e)}")
 
     def __str__(self):
         return f"Tenant: {self.name} - House {self.house_number.house_number}"

@@ -356,12 +356,12 @@ class TenantDetailAPIView(APIView):
         except Tenant.DoesNotExist:
             raise Http404
 
-    def get(self, request, pk):
-        tenant = self.get_object(pk)
+    def get(self, request, pk, *args, **kwargs):
+        tenant = self.get_object(pk,  *args, **kwargs)
         serializer = TenantSerializer(tenant)
         return Response(serializer.data)
 
-    def put(self, request, pk):
+    def put(self, request, pk,  *args, **kwargs):
         tenant = self.get_object(pk)
         serializer = TenantSerializer(tenant, data=request.data)
         if serializer.is_valid():
@@ -369,7 +369,7 @@ class TenantDetailAPIView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def delete(self, request, pk):
+    def delete(self, request, pk,  *args, **kwargs):
         tenant = self.get_object(pk)
         tenant.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
